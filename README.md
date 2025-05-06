@@ -1,8 +1,11 @@
 # Benana
-Opensource Student Information System for a post-AI world.
+Free & Opensource AI ERP for Schools & Colleges
 
 ### 🌟 What is Benana?
-We are reinventing Student Information System from first principles with AI-native architecture.
+We are reinventing Student Information System from first principles with AI-native architecture. We are disrupting on three fronts at same time.
+1. We are disrupting the business model
+2. We are disrupting the techstack
+3. We are disrupting the user experience
 
 ### 🎯 Key Features (Planned)
 - Administration
