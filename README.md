@@ -20,3 +20,5 @@ We're in the early stages, but we'd love your input!
 
 ### 📫 Join the Conversation
 Join the official Telegram group - https://t.me/+4VSCa5EZFO8xMTE9
+
+Join this week's meetup - https://lu.ma/ogf8bgwa
