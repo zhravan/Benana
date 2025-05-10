@@ -21,7 +21,10 @@ In research and team building phase.
 ### 🤝 Get Involved
 We're in the early stages, but we'd love your input!
 
+### 🗓️ Community Meetups
+Meet 1 - 10 May 2025 - https://app.read.ai/analytics/meetings/01JTWAR5G89KK60MZN9NZ8WHXN
+
 ### 📫 Join the Conversation
 Join the official Telegram group - https://t.me/+4VSCa5EZFO8xMTE9
 
-Join this week's meetup - https://lu.ma/ogf8bgwa
+Join our next meetup - Details to be shared soon
