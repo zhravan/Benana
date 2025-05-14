@@ -25,6 +25,7 @@ We're in the early stages, but we'd love your input!
 Meet 1 - 10 May 2025 - https://app.read.ai/analytics/meetings/01JTWAR5G89KK60MZN9NZ8WHXN
 
 ### 📫 Join the Conversation
-Join the official Telegram group - https://t.me/+4VSCa5EZFO8xMTE9
 
-Join our next meetup - Details to be shared soon
+Join the Discord - https://discord.gg/2KysKqB8
+
+Join the official Telegram group - https://t.me/+4VSCa5EZFO8xMTE9
