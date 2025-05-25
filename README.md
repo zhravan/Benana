@@ -1,3 +1,5 @@
+![Instagram post - 10(2)](https://github.com/user-attachments/assets/c2e8f47b-3dee-4017-a7dd-c324e900aa81)
+
 # Benana
 Free & Opensource AI ERP for Schools & Colleges
 
