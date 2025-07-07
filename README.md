@@ -28,4 +28,4 @@ Meet 1 - 10 May 2025 - https://app.read.ai/analytics/meetings/01JTWAR5G89KK60MZN
 
 ### 📫 Join the Conversation
 
-Join the Discord - https://discord.gg/2KysKqB8
+Join the Discord - https://discord.gg/RsCDaq5F
