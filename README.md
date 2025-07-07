@@ -1,4 +1,4 @@
-<img src="https://github.com/user-attachments/assets/c2e8f47b-3dee-4017-a7dd-c324e900aa81" alt="Instagram post - 10(2)" width="500">
+<img src="https://github.com/user-attachments/assets/8f0cc138-5f63-4f8c-b879-e21790beab5b" alt="Instagram post - 10(2)" width="200">
 
 # Benana
 Free & Opensource AI ERP for Schools & Colleges
@@ -29,5 +29,3 @@ Meet 1 - 10 May 2025 - https://app.read.ai/analytics/meetings/01JTWAR5G89KK60MZN
 ### 📫 Join the Conversation
 
 Join the Discord - https://discord.gg/2KysKqB8
-
-Join the official Telegram group - https://t.me/+4VSCa5EZFO8xMTE9
