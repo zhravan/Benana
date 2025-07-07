@@ -1,6 +1,5 @@
-<img src="https://github.com/user-attachments/assets/8f0cc138-5f63-4f8c-b879-e21790beab5b" alt="Instagram post - 10(2)" width="200">
-
 ### Benana - Free & Opensource AI ERP for Schools & Colleges
+![Screenshot 2025-07-07 at 10 22 56 PM](https://github.com/user-attachments/assets/558a9cc8-ae37-4f16-8d96-6fc4bfca904c)
 
 # A New Breed Of ERP.
 The all-in-one ERP that seemed impossible has arrived. Meticulously engineered, breathtakingly complete, with a promise to liberate you from licensing fees and customization costs forever.
