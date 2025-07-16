@@ -1,6 +1,6 @@
 # How Educational Institutions Work: A Developer's Guide
 
-> **Welcome to the Open-Source School Management Software Project!** 🎓  
+> **Welcome to the Benana Open-Source School Management Software Project!** 🎓  
 > This guide will help you understand how educational institutions operate so you can build software that truly serves schools and colleges.
 
 ## 📋 Table of Contents
