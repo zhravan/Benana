@@ -1,0 +1,26 @@
+{
+  "name": "benana",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Free & Opensource AI ERP for Schools & Colleges",
+  "scripts": {
+    "setup": "make setup",
+    "dev:admin": "make dev-admin",
+    "dev:student": "make dev-student",
+    "dev:both": "make dev-both",
+    "build": "make build-core",
+    "clean": "make clean",
+    "view:dev": "cd view && pnpm dev",
+    "view:dev:admin": "cd view/apps/admin && pnpm dev",
+    "view:dev:student": "cd view/apps/student && pnpm dev",
+    "view:build": "cd view && pnpm build",
+    "view:install": "cd view && pnpm install"
+  },
+  "workspaces": [
+    "view"
+  ],
+  "devDependencies": {},
+  "engines": {
+    "node": ">=20"
+  }
+}
