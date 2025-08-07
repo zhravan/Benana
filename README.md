@@ -29,40 +29,13 @@ We are reinventing Student Information System from first principles with AI-nati
 
 In research and team building phase.
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
 - Node.js 20 or higher
 - pnpm package manager
 - Go (for backend development)
-
-### Quick Start
-
-1. **Setup (one-time):**
-
-   ```bash
-   # Complete setup including dependencies and backend build
-   make setup
-   ```
-
-2. **Development:**
-
-   ```bash
-   # Start both admin and student portals
-   npm run view:dev
-
-   # Or start individual services:
-   make dev-admin      # Admin portal at http://localhost:3000
-   make dev-student    # Student portal at http://localhost:3001
-   ```
-
-3. **Build:**
-
-   ```bash
-   make build-core     # Build Go backend
-   npm run view:build  # Build all frontend apps
-   ```
 
 ### Project Structure
 
