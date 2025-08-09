@@ -4,4 +4,5 @@ use (
 	.
 	./plugins/core
 	./plugins/powertable
+	./plugins/types
 )

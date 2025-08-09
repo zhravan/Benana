@@ -1,158 +1,94 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
-	"os"
-	"sync"
+	"benana/types"
+	"context"
+	"log"
 
 	"github.com/go-fuego/fuego"
+	"github.com/google/uuid"
 )
 
-type Plugin struct {
-	ID          string `json:"ID"`
-	Name        string `json:"Name"`
-	Description string `json:"Description"`
-	Version     string `json:"Version"`
-	Author      string `json:"Author"`
-	Type        string `json:"Type"`
-}
-
-type Plugins struct {
-	data sync.Map
-}
-
-func (p *Plugins) Add(plugin Plugin) {
-	p.data.Store(plugin.ID, plugin)
-}
-
-func (p *Plugins) Delete(id string) {
-	p.data.Delete(id)
-}
-
-func (p *Plugins) Update(id string, plugin Plugin) {
-	p.data.Store(id, plugin)
-}
-
-func (p *Plugins) GetByName(name string) (*Plugin, error) {
-	var result *Plugin
-	found := false
-
-	p.data.Range(func(_, value any) bool {
-		plugin, ok := value.(Plugin)
-		if !ok {
-			return true
-		}
-		if plugin.Name == name {
-			result = &plugin
-			found = true
-			return false
-		}
-		return true
-	})
-
-	if !found {
-		return nil, fmt.Errorf("plugin with name %q not found", name)
-	}
-	return result, nil
-}
-
-func (p *Plugins) GetByID(id string) (*Plugin, error) {
-	value, ok := p.data.Load(id)
-	if !ok {
-		return nil, fmt.Errorf("plugin with ID %q not found", id)
-	}
-	plugin, ok := value.(Plugin)
-	if !ok {
-		return nil, fmt.Errorf("failed to convert value to Plugin")
-	}
-	return &plugin, nil
-}
-
-func (p *Plugins) GetAll() ([]Plugin, error) {
-	var all []Plugin
-	p.data.Range(func(_, value any) bool {
-		plugin, ok := value.(Plugin)
-		if ok {
-			all = append(all, plugin)
-		}
-		return true
-	})
-	return all, nil
-}
-
-func LoadPluginsFromFile(path string) (*Plugins, error) {
-	file, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	var raw []Plugin
-	if err := json.Unmarshal(file, &raw); err != nil {
-		return nil, err
-	}
-
-	p := &Plugins{}
-	for _, plugin := range raw {
-		p.Add(plugin)
-	}
-	return p, nil
-}
-
-// NewPluginListResponse creates a new successful plugin list response
-func NewPluginListResponse(status int, message string, data *[]Plugin) *PluginListResponse {
-	return &PluginListResponse{
-		Success: true,
-		Status:  status,
-		Message: message,
-		Data:    data,
-	}
-}
-
-// PluginListResponse is a concrete type for plugin list responses
-type PluginListResponse struct {
-	Success    bool           `json:"success"`
-	Status     int            `json:"status"`
-	Message    string         `json:"message"`
-	Data       *[]Plugin      `json:"data"`
-	Errors     []APIError     `json:"errors,omitempty"`
-	Meta       *APIMeta       `json:"meta,omitempty"`
-	Pagination *APIPagination `json:"pagination,omitempty"`
-	Warnings   []APIWarning   `json:"warnings,omitempty"`
-}
-
-// NewPluginListErrorResponse creates a new error plugin list response
-func NewPluginListErrorResponse(status int, message string, errors []APIError) *PluginListResponse {
-	return &PluginListResponse{
-		Success: false,
-		Status:  status,
-		Message: message,
-		Data:    nil,
-		Errors:  errors,
-	}
-}
+// TODO: Move to config or setup a discovery property in the plugin manager
+const (
+	pluginsDir   = "../"
+	binariesDir  = "./bin/plugins"
+	activeStatus = "active"
+)
 
 func main() {
+	db, err := types.ConnectDatabaseAndRunMigrations()
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
+	}
+	defer db.Close()
+
 	s := fuego.NewServer()
-	fuego.Get(s, "/plugins", getPlugins)
+	setupPluginSystem(s, db)
+	setupRoutes(s)
 	s.Run()
 }
 
-func getPlugins(c fuego.ContextNoBody) (*PluginListResponse, error) {
-	plugins, err := LoadPluginsFromFile("./plugins.json")
+func setupPluginSystem(s *fuego.Server, db *types.Database) {
+	InitPluginController(db)
+
+	discovery := NewDiscovery(NewRepository(db))
+	pluginManager := NewPluginManager(s, discovery, pluginsDir, binariesDir)
+
+	discoverAndRegisterPlugins(pluginManager, discovery)
+	loadActivePlugins(pluginManager)
+	startEventListener(pluginManager)
+}
+
+func discoverAndRegisterPlugins(pluginManager *PluginManager, discovery *Discovery) {
+	discoveredPlugins, err := pluginManager.DiscoverNewPlugins(context.Background())
 	if err != nil {
-		return NewPluginListErrorResponse(500, "Failed to retrieve plugins", []APIError{
-			{Code: "INTERNAL_ERROR", Message: err.Error()},
-		}), nil
+		log.Printf("Failed to discover plugins: %v", err)
+		return
 	}
 
-	allPlugins, err := plugins.GetAll()
-	if err != nil {
-		errorResponse := NewPluginListErrorResponse(500, "Failed to retrieve plugins", []APIError{
-			{Code: "INTERNAL_ERROR", Message: err.Error()},
-		})
-		return errorResponse, nil
+	for _, discoveredPlugin := range discoveredPlugins {
+		if isPluginAlreadyRegistered(discovery, discoveredPlugin.Name) {
+			continue
+		}
+
+		registerNewPlugin(pluginManager, &discoveredPlugin)
+	}
+}
+
+func isPluginAlreadyRegistered(discovery *Discovery, pluginName string) bool {
+	if existing, err := discovery.GetPluginByName(context.Background(), pluginName); err == nil {
+		log.Printf("Plugin %s already exists in database, skipping registration", existing.Name)
+		return true
+	}
+	return false
+}
+
+func registerNewPlugin(pluginManager *PluginManager, discoveredPlugin *types.Plugin) {
+	discoveredPlugin.ID = uuid.New().String()
+	discoveredPlugin.Status = activeStatus
+
+	if err := pluginManager.ValidateAndRegisterPlugin(context.Background(), discoveredPlugin); err != nil {
+		log.Printf("Failed to validate and register plugin %s: %v", discoveredPlugin.Name, err)
+		return
 	}
 
-	response := NewPluginListResponse(200, "Plugins retrieved successfully", &allPlugins)
-	return response, nil
+	log.Printf("Successfully validated and registered plugin: %s", discoveredPlugin.Name)
+}
+
+func loadActivePlugins(pluginManager *PluginManager) {
+	if err := pluginManager.LoadActivePlugins(context.Background()); err != nil {
+		log.Printf("Failed to load active plugins: %v", err)
+	}
+}
+
+func startEventListener(pluginManager *PluginManager) {
+	if err := pluginManager.StartEventListener(context.Background()); err != nil {
+		log.Printf("Failed to start plugin event listener: %v", err)
+	}
+}
+
+func setupRoutes(s *fuego.Server) {
+	fuego.Get(s, "/plugins", GetPlugins)
+	fuego.Get(s, "/plugins/{name}", GetPluginByName)
 }
