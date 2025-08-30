@@ -31,3 +31,8 @@ class PluginMigration(Base):
 
     __table_args__ = (UniqueConstraint("plugin", "migration_id", name="uq_plugin_migration"),)
 
+
+class DummyCore(Base):
+    __tablename__ = "dummy_core_table"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(255), nullable=False)
