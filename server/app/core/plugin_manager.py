@@ -7,7 +7,7 @@ from datetime import datetime
 import uuid
 from pathlib import Path
 from typing import Dict, Optional
-
+import logging as _logging
 from fastapi import FastAPI, APIRouter
 
 from .settings import get_settings, Settings
@@ -36,7 +36,9 @@ class PluginManager:
             Path.cwd() / configured,
             Path.cwd().parent / configured,
         ]
-        self.plugins_dir = next((c for c in candidates if c.exists() and c.is_dir()), configured)
+        self.plugins_dir = next(
+            (c for c in candidates if c.exists() and c.is_dir()), configured
+        )
         self.registry = ServiceRegistry()
         self.permissions = PermissionRegistry()
         self.loaded: Dict[str, LoadedPlugin] = {}
@@ -59,7 +61,7 @@ class PluginManager:
             logging.getLogger(__name__).warning("Autoload failed: %s", e)
 
     def shutdown(self) -> None:
-        # Unload all
+        # Unload all runtime plugins without mutating DB state
         for name in list(self.loaded.keys()):
             self.unload(name)
 
@@ -73,7 +75,6 @@ class PluginManager:
         - Plugins with DB status='disabled' are skipped even if present on disk.
         - If DB marks active but folder is missing, log a warning and skip.
         """
-        import logging as _logging
 
         # Current DB states
         with get_session() as s:
@@ -94,7 +95,9 @@ class PluginManager:
                     )
             else:
                 _logging.getLogger(__name__).info(
-                    "Plugin '%s' present on disk but DB status is '%s'; skipping", name, status
+                    "Plugin '%s' present on disk but DB status is '%s'; skipping",
+                    name,
+                    status,
                 )
 
         # Warn about DB-active plugins whose folders are missing
@@ -168,24 +171,31 @@ class PluginManager:
                 # seeding is optional; do not fail plugin load for seed errors
                 s.rollback()
 
-        self.loaded[name] = LoadedPlugin(plugin=plugin, module_name=module_name, router=router)
+        self.loaded[name] = LoadedPlugin(
+            plugin=plugin, module_name=module_name, router=router
+        )
 
     def unload(self, name: str) -> None:
         lp = self.loaded.get(name)
         if not lp:
             return
         try:
-            lp.plugin.on_unload({"services": self.registry, "permissions": self.permissions})
+            lp.plugin.on_unload(
+                {"services": self.registry, "permissions": self.permissions}
+            )
         finally:
             # Note: FastAPI does not provide a first-class API to deregister routes at runtime.
             # In practice, we keep routes but mark plugin disabled in DB; full removal would rebuild the app/router.
-            # For now, keep simple: remove from loaded registry only.
+            # For now, keep simple: remove from loaded registry only (do not mutate DB status here).
             self.loaded.pop(name, None)
-            # Persist disabled status
-            with get_session() as s:
-                row = s.query(PluginModel).filter_by(name=name).one_or_none()
-                if row is not None:
-                    row.status = "disabled"
+
+    def disable(self, name: str) -> None:
+        """Explicitly disable a plugin: set DB status and unload runtime state."""
+        with get_session() as s:
+            row = s.query(PluginModel).filter_by(name=name).one_or_none()
+            if row is not None:
+                row.status = "disabled"
+        self.unload(name)
 
     def reload(self, name: str) -> None:
         lp = self.loaded.get(name)
