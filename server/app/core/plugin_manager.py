@@ -13,7 +13,7 @@ from fastapi import FastAPI, APIRouter
 from .settings import get_settings, Settings
 from .service_registry import ServiceRegistry
 from .plugin_spi import BasePlugin
-from .migrator import apply_plugin_migrations
+from .migrator import apply_plugin_migrations, rollback_plugin_migrations
 from .db import get_session
 from .models import Plugin as PluginModel
 from .permissions import PermissionRegistry
@@ -138,3 +138,10 @@ class PluginManager:
         if module_name in sys.modules:
             del sys.modules[module_name]
         self.load(name)
+
+    def rollback(self, name: str, steps: int = 1) -> list[str]:
+        # Use filesystem path to migrations to avoid requiring plugin import
+        migrations_dir = (self.plugins_dir / name / "migrations").resolve()
+        if not migrations_dir.exists():
+            raise RuntimeError(f"Migrations dir not found for plugin '{name}': {migrations_dir}")
+        return rollback_plugin_migrations(name, migrations_dir, steps)
