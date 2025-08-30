@@ -57,27 +57,44 @@ class PluginManager:
             self.unload(name)
 
     def autoload_active(self) -> None:
-        """Load plugins marked active in DB and present on disk; apply pending migrations.
+        """Autoload plugins at startup.
 
-        Missing plugin folders are skipped with a warning.
+        Rules:
+        - Any plugin present on disk (plugins/<name>/plugin.py) is enabled by default
+          if no prior DB record exists.
+        - Plugins with DB status='active' are loaded (if folder exists).
+        - Plugins with DB status='disabled' are skipped even if present on disk.
+        - If DB marks active but folder is missing, log a warning and skip.
         """
-        from pathlib import Path as _Path
         import logging as _logging
 
+        # Current DB states
         with get_session() as s:
-            rows = s.query(PluginModel).filter_by(status="active").all()
-        for row in rows:
-            pdir = (self.plugins_dir / row.name)
-            if not (pdir.exists() and (pdir / "plugin.py").exists()):
-                _logging.getLogger(__name__).warning(
-                    "Active plugin '%s' not found at %s; skipping", row.name, pdir
+            rows = s.query(PluginModel).all()
+        states = {r.name: r.status for r in rows}
+
+        discovered = set(self.discover())
+
+        # Load discovered plugins that are either new (no DB record) or marked active
+        for name in sorted(discovered):
+            status = states.get(name)
+            if status is None or status == "active":
+                try:
+                    self.load(name)
+                except Exception as exc:
+                    _logging.getLogger(__name__).error(
+                        "Failed to autoload plugin '%s': %s", name, exc
+                    )
+            else:
+                _logging.getLogger(__name__).info(
+                    "Plugin '%s' present on disk but DB status is '%s'; skipping", name, status
                 )
-                continue
-            try:
-                self.load(row.name)
-            except Exception as exc:
-                _logging.getLogger(__name__).error(
-                    "Failed to autoload plugin '%s': %s", row.name, exc
+
+        # Warn about DB-active plugins whose folders are missing
+        for name, status in states.items():
+            if status == "active" and name not in discovered:
+                _logging.getLogger(__name__).warning(
+                    "Active plugin '%s' not found on disk; skipping", name
                 )
 
     def discover(self) -> list[str]:
