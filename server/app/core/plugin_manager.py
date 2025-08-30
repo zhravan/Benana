@@ -16,6 +16,7 @@ from .plugin_spi import BasePlugin
 from .migrator import apply_plugin_migrations
 from .db import get_session
 from .models import Plugin as PluginModel
+from .permissions import PermissionRegistry
 
 
 @dataclass
@@ -30,13 +31,15 @@ class PluginManager:
         self.settings = settings or get_settings()
         self.plugins_dir = Path(self.settings.plugins_dir)
         self.registry = ServiceRegistry()
+        self.permissions = PermissionRegistry()
         self.loaded: Dict[str, LoadedPlugin] = {}
 
     def startup(self, app: FastAPI) -> None:
         # Ensure 'plugins' namespace is importable
-        root = Path.cwd()
-        if str(root) not in sys.path:
-            sys.path.insert(0, str(root))
+        # Ensure parent of plugins_dir is on sys.path so `import plugins.*` works
+        parent = self.plugins_dir.resolve().parent
+        if str(parent) not in sys.path:
+            sys.path.insert(0, str(parent))
         # Optionally auto-load core plugins later (after we have any)
         self.app = app
 
@@ -91,12 +94,23 @@ class PluginManager:
                 row.updated_at = now
 
         # on_load
-        plugin.on_load({"services": self.registry})
+        plugin.on_load({"services": self.registry, "permissions": self.permissions})
 
         # Register routes
         router = APIRouter()
         plugin.register_routes(self.app, router)
         self.app.include_router(router, prefix=f"/{name}", tags=[name])
+
+        # Register declared permissions
+        self.permissions.register(plugin.name, plugin.register_permissions())
+
+        # Seed (optional)
+        with get_session() as s:
+            try:
+                plugin.seed(s)
+            except Exception:
+                # seeding is optional; do not fail plugin load for seed errors
+                s.rollback()
 
         self.loaded[name] = LoadedPlugin(plugin=plugin, module_name=module_name, router=router)
 
@@ -105,12 +119,17 @@ class PluginManager:
         if not lp:
             return
         try:
-            lp.plugin.on_unload({"services": self.registry})
+            lp.plugin.on_unload({"services": self.registry, "permissions": self.permissions})
         finally:
             # Note: FastAPI does not provide a first-class API to deregister routes at runtime.
             # In practice, we keep routes but mark plugin disabled in DB; full removal would rebuild the app/router.
             # For now, keep simple: remove from loaded registry only.
             self.loaded.pop(name, None)
+            # Persist disabled status
+            with get_session() as s:
+                row = s.query(PluginModel).filter_by(name=name).one_or_none()
+                if row is not None:
+                    row.status = "disabled"
 
     def reload(self, name: str) -> None:
         lp = self.loaded.get(name)
