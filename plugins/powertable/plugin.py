@@ -9,10 +9,10 @@ from server.app.core.plugin_spi import BasePlugin, Permission
 from .routes import get_router
 
 
-class ReportsPlugin(BasePlugin):
-    name = "sample_reports"
+class PowerTablePlugin(BasePlugin):
+    name = "powertable"
     version = "0.1.0"
-    description = "Sample Reports plugin"
+    description = "PowerTable plugin"
     is_core = False
 
     @staticmethod
@@ -20,13 +20,8 @@ class ReportsPlugin(BasePlugin):
         return Path(__file__).parent / "migrations"
 
     def on_load(self, ctx: dict[str, Any]) -> None:
-        # Inter-plugin example: read a service from powertable if present
         services = ctx.get("services")
-        try:
-            echo = services.get("powertable.echo")
-            echo("warmup")
-        except Exception:
-            pass
+        services.register("powertable.echo", lambda x: x)
 
     def register_routes(self, app: FastAPI, router: APIRouter) -> None:
         sub = get_router()
@@ -35,7 +30,8 @@ class ReportsPlugin(BasePlugin):
 
     def register_permissions(self):
         return [
-            Permission(key="reports:view", description="View reports"),
+            Permission(key="powertable:view", description="View powertable"),
+            Permission(key="powertable:edit", description="Edit powertable"),
         ]
 
     def seed(self, db) -> None:
@@ -46,5 +42,5 @@ class ReportsPlugin(BasePlugin):
 
 
 def get_plugin() -> BasePlugin:
-    return ReportsPlugin()
+    return PowerTablePlugin()
 
