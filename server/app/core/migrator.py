@@ -57,18 +57,23 @@ def get_applied_migrations(plugin_name: str) -> dict[str, str]:
 
 
 def apply_plugin_migrations(plugin_name: str, migrations_dir: Path) -> None:
-    """Apply lexicographically ordered .sql migrations for a plugin.
+    """Apply all pending .sql migrations for a plugin in a single transaction.
 
-    Records each applied migration with a checksum and fails fast on drift.
+    - Skips `.down.sql` files (reserved for rollbacks).
+    - Validates checksum drift before applying.
+    - Executes DDL and inserts tracking rows atomically.
     """
     files = _list_sql_files(migrations_dir)
     if not files:
         return
 
     applied = get_applied_migrations(plugin_name)
+
+    # Build list of pending migrations (id, sql, checksum) and pre-check drift
+    pending: list[tuple[str, str, str]] = []
     for f in files:
         if _is_down_file(f):
-            continue  # skip down files on apply
+            continue
         mig_id = _migration_id_from_path(f)
         data = f.read_bytes()
         cs = _checksum(data)
@@ -78,19 +83,28 @@ def apply_plugin_migrations(plugin_name: str, migrations_dir: Path) -> None:
                 raise RuntimeError(
                     f"Checksum mismatch for {plugin_name}:{mig_id} (drift detected)"
                 )
-            # already applied with same checksum
-            continue
+            continue  # already applied
+        pending.append((mig_id, data.decode("utf-8"), cs))
 
-        sql = data.decode("utf-8")
-        assert _db.engine is not None
-        with _db.engine.begin() as conn:
+    if not pending:
+        return
+
+    # Apply all pending migrations in a single transaction (DDL is transactional in Postgres)
+    assert _db.engine is not None
+    with _db.engine.begin() as conn:
+        for mig_id, sql, _ in pending:
             conn.execute(text(sql))
-            with _db.get_session() as s:
-                s.add(
-                    PluginMigration(
-                        plugin=plugin_name, migration_id=mig_id, checksum=cs
-                    )
-                )
+        # Record applied migrations within the same transaction
+        for mig_id, _sql, cs in pending:
+            conn.execute(
+                text(
+                    """
+                    INSERT INTO plugin_migrations (plugin, migration_id, checksum, applied_at)
+                    VALUES (:p, :m, :c, CURRENT_TIMESTAMP)
+                    """
+                ),
+                {"p": plugin_name, "m": mig_id, "c": cs},
+            )
 
 
 def list_applied(plugin_name: str) -> List[PluginMigration]:
