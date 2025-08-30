@@ -35,7 +35,7 @@ def enable_plugin(name: str, pm=Depends(_pm)):
 
 @router.post("/plugins/{name}/disable")
 def disable_plugin(name: str, pm=Depends(_pm)):
-    pm.unload(name)
+    pm.disable(name)
     return {"status": "disabled", "name": name}
 
 
@@ -65,7 +65,9 @@ def install_plugin(file: UploadFile, pm=Depends(_pm)):
                     dest = staging / member.filename
                     dest_abs = dest.resolve()
                     if not str(dest_abs).startswith(str(staging.resolve())):
-                        raise HTTPException(status_code=400, detail="Invalid archive paths")
+                        raise HTTPException(
+                            status_code=400, detail="Invalid archive paths"
+                        )
                     if member.is_dir():
                         dest.mkdir(parents=True, exist_ok=True)
                     else:
@@ -77,14 +79,19 @@ def install_plugin(file: UploadFile, pm=Depends(_pm)):
             candidates = [p.parent for p in staging.rglob("plugin.py")]
             candidates = [c for c in candidates if (c / "plugin.py").exists()]
             if len(candidates) != 1:
-                raise HTTPException(status_code=400, detail="Archive must contain exactly one plugin root with plugin.py")
+                raise HTTPException(
+                    status_code=400,
+                    detail="Archive must contain exactly one plugin root with plugin.py",
+                )
             plugin_root = candidates[0]
             name = plugin_root.name
 
             # Install into plugins/<name>
             dest_dir = Path(pm.plugins_dir) / name
             if dest_dir.exists():
-                raise HTTPException(status_code=409, detail=f"Plugin '{name}' already exists")
+                raise HTTPException(
+                    status_code=409, detail=f"Plugin '{name}' already exists"
+                )
             dest_dir.parent.mkdir(parents=True, exist_ok=True)
             shutil.copytree(plugin_root, dest_dir)
 
@@ -95,7 +102,3 @@ def install_plugin(file: UploadFile, pm=Depends(_pm)):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
-
-# Rollback is not exposed as a separate admin endpoint; down migrations
-# are intended to be part of a higher-level lifecycle (e.g., uninstall).
