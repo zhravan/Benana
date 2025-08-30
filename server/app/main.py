@@ -3,9 +3,9 @@ from fastapi.responses import ORJSONResponse
 
 from .core.settings import get_settings
 from .core.db import init_engine_and_session
-from .core.migrator import bootstrap
+from .core.migrator import bootstrap, run_host_migrations
 from .core.plugin_manager import PluginManager
-from .api.admin import router as admin_router
+from .api.plugin_management import router as admin_router
 
 
 app = FastAPI(default_response_class=ORJSONResponse, title="Benana Host Runtime")
@@ -18,7 +18,8 @@ def on_startup():
     # Initialize DB engine/session
     init_engine_and_session(settings)
 
-    # Ensure host bootstrap tables exist
+    # Run host migrations (Alembic) first, then ensure bootstrap tables (for plugin tracking)
+    run_host_migrations(upgrade=True)
     bootstrap()
 
     # Initialize plugin manager and load active/core plugins later
@@ -38,4 +39,3 @@ def health():
 
 
 app.include_router(admin_router, prefix="/admin", tags=["admin"])
-
