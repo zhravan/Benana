@@ -8,19 +8,19 @@ from typing import Iterable, List
 
 from sqlalchemy import text, select
 
-from .db import engine, get_session
+from . import db as _db
 from .models import Base, PluginMigration
 
 
 def bootstrap() -> None:
     """Create host tables if not present."""
-    assert engine is not None, "DB engine not initialized"
-    Base.metadata.create_all(bind=engine)
+    assert _db.engine is not None, "DB engine not initialized"
+    Base.metadata.create_all(bind=_db.engine)
 
 
 def apply_sql_batch(sql: str) -> None:
-    assert engine is not None
-    with engine.begin() as conn:
+    assert _db.engine is not None
+    with _db.engine.begin() as conn:
         conn.execute(text(sql))
 
 
@@ -49,7 +49,7 @@ def _migration_id_from_path(path: Path) -> str:
 
 def get_applied_migrations(plugin_name: str) -> dict[str, str]:
     """Return mapping of migration_id -> checksum for a plugin."""
-    with get_session() as s:
+    with _db.get_session() as s:
         rows: Iterable[PluginMigration] = s.execute(
             select(PluginMigration).where(PluginMigration.plugin == plugin_name)
         ).scalars()
@@ -82,10 +82,10 @@ def apply_plugin_migrations(plugin_name: str, migrations_dir: Path) -> None:
             continue
 
         sql = data.decode("utf-8")
-        assert engine is not None
-        with engine.begin() as conn:
+        assert _db.engine is not None
+        with _db.engine.begin() as conn:
             conn.execute(text(sql))
-            with get_session() as s:
+            with _db.get_session() as s:
                 s.add(
                     PluginMigration(
                         plugin=plugin_name, migration_id=mig_id, checksum=cs
@@ -94,7 +94,7 @@ def apply_plugin_migrations(plugin_name: str, migrations_dir: Path) -> None:
 
 
 def list_applied(plugin_name: str) -> List[PluginMigration]:
-    with get_session() as s:
+    with _db.get_session() as s:
         rows: Iterable[PluginMigration] = s.execute(
             select(PluginMigration).where(PluginMigration.plugin == plugin_name).order_by(PluginMigration.applied_at.desc())
         ).scalars()
@@ -117,10 +117,10 @@ def rollback_plugin_migrations(plugin_name: str, migrations_dir: Path, steps: in
         if not down_file.exists():
             raise RuntimeError(f"Down migration not found for {plugin_name}:{mig_id} -> {down_file.name}")
         sql = down_file.read_text(encoding="utf-8")
-        assert engine is not None
-        with engine.begin() as conn:
+        assert _db.engine is not None
+        with _db.engine.begin() as conn:
             conn.execute(text(sql))
-            with get_session() as s:
+            with _db.get_session() as s:
                 # remove record
                 rec = s.get(PluginMigration, row.id)
                 if rec is not None:
