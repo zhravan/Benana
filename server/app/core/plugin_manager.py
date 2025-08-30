@@ -29,7 +29,14 @@ class LoadedPlugin:
 class PluginManager:
     def __init__(self, settings: Optional[Settings] = None) -> None:
         self.settings = settings or get_settings()
-        self.plugins_dir = Path(self.settings.plugins_dir)
+        # Resolve plugins_dir with sensible fallbacks so running from `server/` works
+        configured = Path(self.settings.plugins_dir)
+        candidates = [
+            configured,
+            Path.cwd() / configured,
+            Path.cwd().parent / configured,
+        ]
+        self.plugins_dir = next((c for c in candidates if c.exists() and c.is_dir()), configured)
         self.registry = ServiceRegistry()
         self.permissions = PermissionRegistry()
         self.loaded: Dict[str, LoadedPlugin] = {}
