@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, List
 
 from sqlalchemy import text, select
 
@@ -34,6 +34,19 @@ def _list_sql_files(path: Path) -> list[Path]:
     return sorted([p for p in path.iterdir() if p.suffix.lower() == ".sql" and p.is_file()])
 
 
+def _is_down_file(path: Path) -> bool:
+    # convention: 0001_xxx.down.sql
+    return path.name.endswith(".down.sql")
+
+
+def _migration_id_from_path(path: Path) -> str:
+    # strip .sql and optional .down suffix
+    stem = path.stem  # e.g., 0001_init or 0001_init.down
+    if stem.endswith(".down"):
+        stem = stem[: -len(".down")]
+    return stem
+
+
 def get_applied_migrations(plugin_name: str) -> dict[str, str]:
     """Return mapping of migration_id -> checksum for a plugin."""
     with get_session() as s:
@@ -54,7 +67,9 @@ def apply_plugin_migrations(plugin_name: str, migrations_dir: Path) -> None:
 
     applied = get_applied_migrations(plugin_name)
     for f in files:
-        mig_id = f.stem
+        if _is_down_file(f):
+            continue  # skip down files on apply
+        mig_id = _migration_id_from_path(f)
         data = f.read_bytes()
         cs = _checksum(data)
         prev = applied.get(mig_id)
@@ -76,3 +91,39 @@ def apply_plugin_migrations(plugin_name: str, migrations_dir: Path) -> None:
                         plugin=plugin_name, migration_id=mig_id, checksum=cs
                     )
                 )
+
+
+def list_applied(plugin_name: str) -> List[PluginMigration]:
+    with get_session() as s:
+        rows: Iterable[PluginMigration] = s.execute(
+            select(PluginMigration).where(PluginMigration.plugin == plugin_name).order_by(PluginMigration.applied_at.desc())
+        ).scalars()
+        return list(rows)
+
+
+def rollback_plugin_migrations(plugin_name: str, migrations_dir: Path, steps: int = 1) -> list[str]:
+    """Rollback the last N applied migrations for a plugin by running corresponding .down.sql files.
+
+    Each rollback is executed in its own transaction; on success, the migration record is removed.
+    """
+    if steps <= 0:
+        return []
+    applied_rows = list_applied(plugin_name)
+    to_rollback = applied_rows[:steps]
+    rolled: list[str] = []
+    for row in to_rollback:
+        mig_id = row.migration_id
+        down_file = migrations_dir / f"{mig_id}.down.sql"
+        if not down_file.exists():
+            raise RuntimeError(f"Down migration not found for {plugin_name}:{mig_id} -> {down_file.name}")
+        sql = down_file.read_text(encoding="utf-8")
+        assert engine is not None
+        with engine.begin() as conn:
+            conn.execute(text(sql))
+            with get_session() as s:
+                # remove record
+                rec = s.get(PluginMigration, row.id)
+                if rec is not None:
+                    s.delete(rec)
+        rolled.append(mig_id)
+    return rolled
