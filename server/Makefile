@@ -22,3 +22,17 @@ test:
 migrate:
 	poetry run python -c "from app.core.migrator import bootstrap; bootstrap()"
 
+# Alembic helpers (host migrations)
+.PHONY: alembic-rev alembic-up alembic-down alembic-stamp
+
+alembic-rev:
+	cd server && poetry run alembic -c alembic.ini revision -m "$$msg"
+
+alembic-up:
+	cd server && poetry run alembic -c alembic.ini upgrade head
+
+alembic-down:
+	cd server && poetry run alembic -c alembic.ini downgrade -1
+
+alembic-stamp:
+	cd server && poetry run alembic -c alembic.ini stamp head
