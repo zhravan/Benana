@@ -24,7 +24,14 @@ def init_engine_and_session(settings: Settings) -> None:
     global engine, SessionLocal
     if engine is None:
         engine = create_engine(_dsn(settings), pool_pre_ping=True, future=True)
-        SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, future=True)
+        # Avoid attribute expiration on commit so ORM rows can be used after context
+        SessionLocal = sessionmaker(
+            bind=engine,
+            autoflush=False,
+            autocommit=False,
+            expire_on_commit=False,
+            future=True,
+        )
 
 
 @contextmanager
@@ -39,4 +46,3 @@ def get_session() -> Iterator[Session]:
         raise
     finally:
         session.close()
-

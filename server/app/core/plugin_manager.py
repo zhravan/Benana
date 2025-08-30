@@ -77,8 +77,8 @@ class PluginManager:
 
         # Current DB states
         with get_session() as s:
-            rows = s.query(PluginModel).all()
-        states = {r.name: r.status for r in rows}
+            rows = s.query(PluginModel.name, PluginModel.status).all()
+            states = {name: status for (name, status) in rows}
 
         discovered = set(self.discover())
 
