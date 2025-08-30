@@ -42,11 +42,43 @@ class PluginManager:
             sys.path.insert(0, str(parent))
         # Optionally auto-load core plugins later (after we have any)
         self.app = app
+        # Autoload any plugins recorded as active in DB
+        try:
+            self.autoload_active()
+        except Exception as e:
+            # avoid failing app startup entirely; log and continue
+            import logging
+
+            logging.getLogger(__name__).warning("Autoload failed: %s", e)
 
     def shutdown(self) -> None:
         # Unload all
         for name in list(self.loaded.keys()):
             self.unload(name)
+
+    def autoload_active(self) -> None:
+        """Load plugins marked active in DB and present on disk; apply pending migrations.
+
+        Missing plugin folders are skipped with a warning.
+        """
+        from pathlib import Path as _Path
+        import logging as _logging
+
+        with get_session() as s:
+            rows = s.query(PluginModel).filter_by(status="active").all()
+        for row in rows:
+            pdir = (self.plugins_dir / row.name)
+            if not (pdir.exists() and (pdir / "plugin.py").exists()):
+                _logging.getLogger(__name__).warning(
+                    "Active plugin '%s' not found at %s; skipping", row.name, pdir
+                )
+                continue
+            try:
+                self.load(row.name)
+            except Exception as exc:
+                _logging.getLogger(__name__).error(
+                    "Failed to autoload plugin '%s': %s", row.name, exc
+                )
 
     def discover(self) -> list[str]:
         if not self.plugins_dir.exists():
