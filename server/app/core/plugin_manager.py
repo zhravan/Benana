@@ -3,6 +3,8 @@ from __future__ import annotations
 import importlib
 import sys
 from dataclasses import dataclass
+from datetime import datetime
+import uuid
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -11,6 +13,9 @@ from fastapi import FastAPI, APIRouter
 from .settings import get_settings, Settings
 from .service_registry import ServiceRegistry
 from .plugin_spi import BasePlugin
+from .migrator import apply_plugin_migrations
+from .db import get_session
+from .models import Plugin as PluginModel
 
 
 @dataclass
@@ -58,8 +63,32 @@ class PluginManager:
             raise RuntimeError(f"Plugin {name} missing get_plugin()")
         plugin: BasePlugin = mod.get_plugin()
 
-        # Apply migrations (todo in subsequent step)
-        # migrations.apply(plugin)
+        # Apply per-plugin migrations
+        migrations_dir = plugin.migrations_path()
+        apply_plugin_migrations(plugin.name, migrations_dir)
+
+        # Ensure plugin record exists/updated
+        with get_session() as s:
+            row = s.query(PluginModel).filter_by(name=plugin.name).one_or_none()
+            now = datetime.utcnow()
+            if row is None:
+                row = PluginModel(
+                    id=str(uuid.uuid4()),
+                    name=plugin.name,
+                    version=plugin.version,
+                    description=getattr(plugin, "description", ""),
+                    is_core=getattr(plugin, "is_core", False),
+                    status="active",
+                    created_at=now,
+                    updated_at=now,
+                )
+                s.add(row)
+            else:
+                row.version = plugin.version
+                row.description = getattr(plugin, "description", row.description)
+                row.is_core = getattr(plugin, "is_core", row.is_core)
+                row.status = "active"
+                row.updated_at = now
 
         # on_load
         plugin.on_load({"services": self.registry})
@@ -84,8 +113,9 @@ class PluginManager:
             self.loaded.pop(name, None)
 
     def reload(self, name: str) -> None:
+        lp = self.loaded.get(name)
+        module_name = lp.module_name if lp else f"plugins.{name}.plugin"
         self.unload(name)
-        if name in sys.modules:
-            del sys.modules[self.loaded[name].module_name]
+        if module_name in sys.modules:
+            del sys.modules[module_name]
         self.load(name)
-
