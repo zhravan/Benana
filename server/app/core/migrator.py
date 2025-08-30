@@ -10,19 +10,39 @@ from typing import Iterable, List
 from sqlalchemy import text, select
 
 from . import db as _db
-from .models import Base, PluginMigration
+from .models import Base, PluginMigration, Plugin as PluginModel
+from alembic.config import Config as AlembicConfig
+from alembic import command as alembic_command
+from pathlib import Path as _Path
 
 
 def bootstrap() -> None:
     """Create host tables if not present."""
     assert _db.engine is not None, "DB engine not initialized"
-    Base.metadata.create_all(bind=_db.engine)
+    # Only ensure tracking tables for plugins exist here; core tables are Alembic-managed
+    PluginModel.__table__.create(bind=_db.engine, checkfirst=True)
+    PluginMigration.__table__.create(bind=_db.engine, checkfirst=True)
 
 
 def apply_sql_batch(sql: str) -> None:
     assert _db.engine is not None
     with _db.engine.begin() as conn:
         conn.execute(text(sql))
+
+
+def run_host_migrations(upgrade: bool = True) -> None:
+    """Run Alembic upgrade head for host migrations when enabled.
+
+    This is intended for dev; in prod, prefer running Alembic via CI/CD.
+    """
+    cfg_path = _Path(__file__).resolve().parents[2] / "alembic.ini"
+    if not cfg_path.exists():
+        logging.getLogger(__name__).info("Alembic config not found at %s; skipping", cfg_path)
+        return
+    cfg = AlembicConfig(str(cfg_path))
+    if upgrade:
+        logging.getLogger(__name__).info("Running host migrations: upgrade head")
+        alembic_command.upgrade(cfg, "head")
 
 
 def _checksum(data: bytes) -> str:
