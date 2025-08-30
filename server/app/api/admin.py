@@ -97,13 +97,5 @@ def install_plugin(file: UploadFile, pm=Depends(_pm)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/plugins/{name}/rollback")
-def rollback_plugin(name: str, steps: int = 1, pm=Depends(_pm)):
-    # For safety, unload if currently loaded
-    if name in pm.loaded:
-        pm.unload(name)
-    try:
-        rolled = pm.rollback(name, steps=steps)
-        return {"status": "rolled_back", "name": name, "migrations": rolled}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+# Rollback is not exposed as a separate admin endpoint; down migrations
+# are intended to be part of a higher-level lifecycle (e.g., uninstall).
