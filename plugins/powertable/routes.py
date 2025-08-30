@@ -6,7 +6,7 @@ def get_router() -> APIRouter:
 
     @r.get("/hello")
     def hello():
-        return {"plugin": "sample_powertable", "message": "Hello from powertable"}
+        return {"plugin": "powertable", "message": "Hello from powertable"}
 
     return r
 

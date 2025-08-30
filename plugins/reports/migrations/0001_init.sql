@@ -1,4 +1,4 @@
--- sample reports initial objects
+-- reports initial objects
 CREATE TABLE IF NOT EXISTS reports (
     id SERIAL PRIMARY KEY,
     title TEXT NOT NULL,
