@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from pathlib import Path
+import logging
 from typing import Iterable, List
 
 from sqlalchemy import text, select
@@ -87,10 +88,18 @@ def apply_plugin_migrations(plugin_name: str, migrations_dir: Path) -> None:
         pending.append((mig_id, data.decode("utf-8"), cs))
 
     if not pending:
+        logging.getLogger(__name__).info(
+            "Migrations: no pending files for plugin '%s'", plugin_name
+        )
         return
 
     # Apply all pending migrations in a single transaction (DDL is transactional in Postgres)
     assert _db.engine is not None
+    logging.getLogger(__name__).info(
+        "Applying migrations for plugin '%s': %s",
+        plugin_name,
+        ", ".join(m for m, _, _ in pending),
+    )
     with _db.engine.begin() as conn:
         for mig_id, sql, _ in pending:
             conn.execute(text(sql))
@@ -125,6 +134,19 @@ def rollback_plugin_migrations(plugin_name: str, migrations_dir: Path, steps: in
     applied_rows = list_applied(plugin_name)
     to_rollback = applied_rows[:steps]
     rolled: list[str] = []
+    if not to_rollback:
+        logging.getLogger(__name__).info(
+            "Rollback: no applied migrations to rollback for plugin '%s'", plugin_name
+        )
+        return []
+
+    logging.getLogger(__name__).info(
+        "Rolling back last %d migrations for plugin '%s': %s",
+        len(to_rollback),
+        plugin_name,
+        ", ".join(r.migration_id for r in to_rollback),
+    )
+
     for row in to_rollback:
         mig_id = row.migration_id
         down_file = migrations_dir / f"{mig_id}.down.sql"
