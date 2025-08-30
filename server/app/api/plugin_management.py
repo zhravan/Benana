@@ -102,3 +102,4 @@ def install_plugin(file: UploadFile, pm=Depends(_pm)):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
