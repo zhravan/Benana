@@ -49,19 +49,18 @@ class PluginManager:
         parent = self.plugins_dir.resolve().parent
         if str(parent) not in sys.path:
             sys.path.insert(0, str(parent))
-        # Optionally auto-load core plugins later (after we have any)
         self.app = app
         # Autoload any plugins recorded as active in DB
         try:
             self.autoload_active()
         except Exception as e:
             # avoid failing app startup entirely; log and continue
+            # TODO: implement proper error handling
             import logging
 
             logging.getLogger(__name__).warning("Autoload failed: %s", e)
 
     def shutdown(self) -> None:
-        # Unload all runtime plugins without mutating DB state
         for name in list(self.loaded.keys()):
             self.unload(name)
 
@@ -184,9 +183,7 @@ class PluginManager:
                 {"services": self.registry, "permissions": self.permissions}
             )
         finally:
-            # Note: FastAPI does not provide a first-class API to deregister routes at runtime.
-            # In practice, we keep routes but mark plugin disabled in DB; full removal would rebuild the app/router.
-            # For now, keep simple: remove from loaded registry only (do not mutate DB status here).
+            # TODO: No way to de register routes in FastAPI, for now makring plugin as disabled in DB. For now remove from loaded registry only, not mutating DB status here; need to check if there is a better way to do this
             self.loaded.pop(name, None)
 
     def disable(self, name: str) -> None:
@@ -204,6 +201,3 @@ class PluginManager:
         if module_name in sys.modules:
             del sys.modules[module_name]
         self.load(name)
-
-    # Down-migration is not exposed via a direct manager API.
-    # It will be handled as part of higher-level lifecycle (e.g., uninstall), if needed.

@@ -23,7 +23,6 @@ app = FastAPI(
 
 
 def custom_openapi():
-    # Build once and cache on app
     if app.openapi_schema:
         return app.openapi_schema
     openapi_schema = get_openapi(
@@ -32,11 +31,10 @@ def custom_openapi():
         description=app.description,
         routes=app.routes,
     )
-    # Tag metadata for core/admin
     tags = openapi_schema.setdefault("tags", [])
     core_tags = {t.get("name") for t in tags}
     for t in (
-        {"name": "admin", "description": "Plugin management APIs"},
+        {"name": "plugin", "description": "Plugin management APIs"},
         {"name": "health", "description": "Health and readiness"},
     ):
         if t["name"] not in core_tags:

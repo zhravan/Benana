@@ -37,7 +37,9 @@ def run_host_migrations(upgrade: bool = True) -> None:
     """
     cfg_path = _Path(__file__).resolve().parents[2] / "alembic.ini"
     if not cfg_path.exists():
-        logging.getLogger(__name__).info("Alembic config not found at %s; skipping", cfg_path)
+        logging.getLogger(__name__).info(
+            "Alembic config not found at %s; skipping", cfg_path
+        )
         return
     cfg = AlembicConfig(str(cfg_path))
     if upgrade:
@@ -52,7 +54,9 @@ def _checksum(data: bytes) -> str:
 def _list_sql_files(path: Path) -> list[Path]:
     if not path.exists() or not path.is_dir():
         return []
-    return sorted([p for p in path.iterdir() if p.suffix.lower() == ".sql" and p.is_file()])
+    return sorted(
+        [p for p in path.iterdir() if p.suffix.lower() == ".sql" and p.is_file()]
+    )
 
 
 def _is_down_file(path: Path) -> bool:
@@ -90,7 +94,7 @@ def apply_plugin_migrations(plugin_name: str, migrations_dir: Path) -> None:
 
     applied = get_applied_migrations(plugin_name)
 
-    # Build list of pending migrations (id, sql, checksum) and pre-check drift
+    # list of pending migrations (id, sql, checksum) and pre-check drift
     pending: list[tuple[str, str, str]] = []
     for f in files:
         if _is_down_file(f):
@@ -113,7 +117,7 @@ def apply_plugin_migrations(plugin_name: str, migrations_dir: Path) -> None:
         )
         return
 
-    # Apply all pending migrations in a single transaction (DDL is transactional in Postgres)
+    # apply all pending migrations in a single transaction
     assert _db.engine is not None
     logging.getLogger(__name__).info(
         "Applying migrations for plugin '%s': %s",
@@ -139,12 +143,16 @@ def apply_plugin_migrations(plugin_name: str, migrations_dir: Path) -> None:
 def list_applied(plugin_name: str) -> List[PluginMigration]:
     with _db.get_session() as s:
         rows: Iterable[PluginMigration] = s.execute(
-            select(PluginMigration).where(PluginMigration.plugin == plugin_name).order_by(PluginMigration.applied_at.desc())
+            select(PluginMigration)
+            .where(PluginMigration.plugin == plugin_name)
+            .order_by(PluginMigration.applied_at.desc())
         ).scalars()
         return list(rows)
 
 
-def rollback_plugin_migrations(plugin_name: str, migrations_dir: Path, steps: int = 1) -> list[str]:
+def rollback_plugin_migrations(
+    plugin_name: str, migrations_dir: Path, steps: int = 1
+) -> list[str]:
     """Rollback the last N applied migrations for a plugin by running corresponding .down.sql files.
 
     Each rollback is executed in its own transaction; on success, the migration record is removed.
@@ -160,18 +168,20 @@ def rollback_plugin_migrations(plugin_name: str, migrations_dir: Path, steps: in
         )
         return []
 
-    logging.getLogger(__name__).info(
-        "Rolling back last %d migrations for plugin '%s': %s",
-        len(to_rollback),
-        plugin_name,
-        ", ".join(r.migration_id for r in to_rollback),
-    )
+        logging.getLogger(__name__).info(
+            "Rolling back last %d migrations for plugin '%s': %s",
+            len(to_rollback),
+            plugin_name,
+            ", ".join(r.migration_id for r in to_rollback),
+        )
 
     for row in to_rollback:
         mig_id = row.migration_id
         down_file = migrations_dir / f"{mig_id}.down.sql"
         if not down_file.exists():
-            raise RuntimeError(f"Down migration not found for {plugin_name}:{mig_id} -> {down_file.name}")
+            raise RuntimeError(
+                f"Down migration not found for {plugin_name}:{mig_id} -> {down_file.name}"
+            )
         sql = down_file.read_text(encoding="utf-8")
         assert _db.engine is not None
         with _db.engine.begin() as conn:
