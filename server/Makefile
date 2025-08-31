@@ -36,3 +36,8 @@ alembic-down:
 
 alembic-stamp:
 	cd server && poetry run alembic -c alembic.ini stamp head
+
+# Generate OpenAPI schema including dynamically loaded plugin routes
+.PHONY: openapi
+openapi:
+	cd server && BENANA_OPENAPI_OUT=server/openapi.json poetry run python scripts/dump_openapi.py
