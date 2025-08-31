@@ -4,14 +4,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="BENANA_", case_sensitive=False)
 
-    # DB
     db_host: str = "localhost"
     db_port: int = 5432
     db_user: str = "benana_user"
     db_password: str = "benana_password"
     db_name: str = "benana"
 
-    # Plugins
     plugins_dir: str = "plugins"
 
 
@@ -23,4 +21,3 @@ def get_settings() -> Settings:
     if _settings is None:
         _settings = Settings()
     return _settings
-
