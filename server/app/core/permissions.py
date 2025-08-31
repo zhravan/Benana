@@ -7,7 +7,7 @@ from .plugin_spi import Permission
 
 class PermissionRegistry:
     def __init__(self) -> None:
-        # maps plugin name -> list of permissions
+        # maps plugin name to list of permissions
         self._perms: Dict[str, List[Permission]] = {}
 
     def register(self, plugin_name: str, permissions: List[Permission]) -> None:
@@ -22,4 +22,3 @@ class PermissionRegistry:
             for perm in perms:
                 out.append((p, perm))
         return out
-

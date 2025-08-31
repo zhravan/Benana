@@ -95,11 +95,10 @@ def install_plugin(file: UploadFile, pm=Depends(_pm)):
             dest_dir.parent.mkdir(parents=True, exist_ok=True)
             shutil.copytree(plugin_root, dest_dir)
 
-            # Try loading it
+            # loading it
             pm.load(name)
             return {"status": "installed", "name": name}
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
