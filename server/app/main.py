@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.responses import ORJSONResponse
+from fastapi.openapi.utils import get_openapi
 
 from .core.settings import get_settings
 from .core.db import init_engine_and_session
@@ -8,7 +9,43 @@ from .core.plugin_manager import PluginManager
 from .api.plugin_management import router as admin_router
 
 
-app = FastAPI(default_response_class=ORJSONResponse, title="Benana Host Runtime")
+app = FastAPI(
+    default_response_class=ORJSONResponse,
+    title="Benana Host Runtime",
+    version="0.1.0",
+    description=(
+        "Benana FastAPI host runtime with dynamic plugins. "
+        "Host uses Alembic for core migrations; plugins provide SQL migrations and routes."
+    ),
+    docs_url="/docs",
+    redoc_url="/redoc",
+)
+
+
+def custom_openapi():
+    # Build once and cache on app
+    if app.openapi_schema:
+        return app.openapi_schema
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+    # Tag metadata for core/admin
+    tags = openapi_schema.setdefault("tags", [])
+    core_tags = {t.get("name") for t in tags}
+    for t in (
+        {"name": "admin", "description": "Plugin management APIs"},
+        {"name": "health", "description": "Health and readiness"},
+    ):
+        if t["name"] not in core_tags:
+            tags.append(t)
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+app.openapi = custom_openapi  # type: ignore
 
 
 @app.on_event("startup")
