@@ -16,7 +16,7 @@ class Plugin(Base):
     version = Column(String(100), nullable=False)
     description = Column(Text, nullable=True)
     is_core = Column(Boolean, default=False, nullable=False)
-    status = Column(String(20), default="active", nullable=False)  # active/disabled
+    status = Column(String(20), default="active", nullable=False)  # active/inactive
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
 

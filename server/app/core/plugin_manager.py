@@ -71,7 +71,7 @@ class PluginManager:
         - Any plugin present on disk (plugins/<name>/plugin.py) is enabled by default
           if no prior DB record exists.
         - Plugins with DB status='active' are loaded (if folder exists).
-        - Plugins with DB status='disabled' are skipped even if present on disk.
+        - Plugins with DB status='inactive' are skipped even if present on disk.
         - If DB marks active but folder is missing, log a warning and skip.
         """
 
@@ -183,15 +183,17 @@ class PluginManager:
                 {"services": self.registry, "permissions": self.permissions}
             )
         finally:
-            # TODO: No way to de register routes in FastAPI, for now makring plugin as disabled in DB. For now remove from loaded registry only, not mutating DB status here; need to check if there is a better way to do this
+            # TODO: No way to de-register routes in FastAPI; for now removing from
+            # loaded registry only, not mutating DB status here; need to check if
+            # there is a better way to do this
             self.loaded.pop(name, None)
 
     def disable(self, name: str) -> None:
-        """Explicitly disable a plugin: set DB status and unload runtime state."""
+        """Explicitly inactivate a plugin: set DB status and unload runtime state."""
         with get_session() as s:
             row = s.query(PluginModel).filter_by(name=name).one_or_none()
             if row is not None:
-                row.status = "disabled"
+                row.status = "inactive"
         self.unload(name)
 
     def reload(self, name: str) -> None:
