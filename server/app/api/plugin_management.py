@@ -36,7 +36,7 @@ def enable_plugin(name: str, pm=Depends(_pm)):
 @router.post("/plugins/{name}/disable")
 def disable_plugin(name: str, pm=Depends(_pm)):
     pm.disable(name)
-    return {"status": "disabled", "name": name}
+    return {"status": "inactive", "name": name}
 
 
 @router.post("/plugins/{name}/reload")
