@@ -1,9 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import ORJSONResponse
 from fastapi.openapi.utils import get_openapi
+from sqlalchemy import text
 
 from .core.settings import get_settings
-from .core.db import init_engine_and_session
+from .core.db import init_engine_and_session, get_session
 from .core.migrator import bootstrap, run_host_migrations
 from .core.plugin_manager import PluginManager
 from .api.plugin_management import router as admin_router
@@ -70,7 +71,33 @@ def on_shutdown():
 
 @app.get("/health")
 def health():
-    return {"status": "ok"}
+    try:
+        with get_session() as session:
+            session.execute(text("SELECT 1"))
+        return {"status": "ok", "database": "connected"}
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Database connection failed: {str(e)}"
+        )
 
+
+@app.get("/")
+def root_message():
+    try:
+        with get_session() as session:
+            session.execute(text("SELECT 1"))
+        return {
+            "status": "ok", 
+            "message": "🍌 Benana is not just a fruit, it's a way of ERP! 🍌",
+            "database": "connected"
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": "🍌 Benana is running but database is not connected! 🍌",
+            "error": str(e),
+            "database": "disconnected"
+        }
 
 app.include_router(admin_router, prefix="/admin", tags=["admin"])
